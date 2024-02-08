@@ -21,6 +21,14 @@ type Tree struct {
 	root *Node
 }
 
+// MustInsert panics if the route is invalid
+func (t *Tree) MustInsert(route string, path string) {
+	if err := t.Insert(route, path); err != nil {
+		panic(err)
+	}
+}
+
+// Insert a route that maps to a path into the tree
 func (t *Tree) Insert(route string, path string) error {
 	r, err := parser.Parse(trimTrailingSlash(route))
 	if err != nil {
@@ -161,6 +169,7 @@ func createSlots(route *ast.Route, slotValues []string) (slots []*Slot) {
 	return slots
 }
 
+// Match represents a route that matches a path
 type Match struct {
 	Route *ast.Route
 	Input string
@@ -182,6 +191,7 @@ func (m *Match) String() string {
 	return s.String()
 }
 
+// Match a input path to a route
 func (t *Tree) Match(input string) (*Match, error) {
 	input = trimTrailingSlash(input)
 	// A tree without any routes shouldn't panic
@@ -259,6 +269,7 @@ func (n *Node) find(route string, sections ast.Sections) (*Node, error) {
 	return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
 }
 
+// FindByPrefix finds a node by a prefix
 func (t *Tree) FindByPrefix(prefix string) (*Node, error) {
 	route, err := parser.Parse(trimTrailingSlash(prefix))
 	if err != nil {
