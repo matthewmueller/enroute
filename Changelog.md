@@ -1,3 +1,7 @@
+# 0.0.4 / 2024-02-10
+
+- fix panics where no routes have been added yet
+
 # 0.0.3 / 2024-02-07
 
 - add a MustInsert
