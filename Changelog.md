@@ -1,3 +1,7 @@
+# 0.0.6 / 2024-02-11
+
+- expose a Parse function
+
 # 0.0.5 / 2024-02-11
 
 - move ast outside of internal
