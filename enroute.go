@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/matthewmueller/enroute/internal/ast"
+	"github.com/matthewmueller/enroute/ast"
 	"github.com/matthewmueller/enroute/internal/parser"
 )
 

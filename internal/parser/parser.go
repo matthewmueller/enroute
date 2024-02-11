@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/matthewmueller/enroute/internal/ast"
+	"github.com/matthewmueller/enroute/ast"
 	"github.com/matthewmueller/enroute/internal/lexer"
 	"github.com/matthewmueller/enroute/internal/token"
 )
