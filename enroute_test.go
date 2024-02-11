@@ -921,3 +921,14 @@ func ExampleMatch() {
 	// branch main
 	// path internal/parser/parser.go
 }
+
+func TestParse(t *testing.T) {
+	is := is.New(t)
+	route, err := enroute.Parse("/posts/{post_id}/comments/{id}")
+	is.NoErr(err)
+	is.Equal(route.String(), "/posts/{post_id}/comments/{id}")
+	route, err = enroute.Parse("posts/{post_id}/comments/{id}")
+	is.True(err != nil)
+	is.Equal(err.Error(), "path must start with a slash /")
+	is.Equal(route, nil)
+}

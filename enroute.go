@@ -17,6 +17,11 @@ func New() *Tree {
 	return &Tree{}
 }
 
+// Parse a route
+func Parse(route string) (*ast.Route, error) {
+	return parser.Parse(route)
+}
+
 type Tree struct {
 	root *Node
 }
