@@ -472,6 +472,12 @@ func TestNoRoutes(t *testing.T) {
 	match, err = tree.Match("/a")
 	is.True(errors.Is(err, enroute.ErrNoMatch))
 	is.Equal(match, nil)
+	tree.Each(func(n *enroute.Node) bool {
+		is.Fail() // should not be called
+		return true
+	})
+	is.Equal(tree.String(), "")
+
 }
 
 func TestAllMatch(t *testing.T) {

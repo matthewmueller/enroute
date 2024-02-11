@@ -307,6 +307,9 @@ func (n *Node) findByPrefix(prefix string, sections ast.Sections) (*Node, error)
 }
 
 func (t *Tree) String() string {
+	if t.root == nil {
+		return ""
+	}
 	return t.string(t.root, "")
 }
 
@@ -332,6 +335,9 @@ func (t *Tree) string(n *Node, indent string) string {
 
 // Traverse the tree in depth-first order
 func (t *Tree) Each(fn func(n *Node) (next bool)) {
+	if t.root == nil {
+		return
+	}
 	t.each(t.root, fn)
 }
 
