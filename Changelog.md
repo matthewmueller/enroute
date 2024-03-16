@@ -1,3 +1,7 @@
+# 0.0.9 / 2024-03-16
+
+- Rename match.Input to match.Path
+
 # 0.0.8 / 2024-03-16
 
 - reduce public api and align match key
