@@ -27,42 +27,44 @@ type Tree struct {
 }
 
 // MustInsert panics if the route is invalid
-func (t *Tree) MustInsert(route string, path string) {
-	if err := t.Insert(route, path); err != nil {
+func (t *Tree) MustInsert(route string, key string) {
+	if err := t.Insert(route, key); err != nil {
 		panic(err)
 	}
 }
 
-// Insert a route that maps to a path into the tree
-func (t *Tree) Insert(route string, path string) error {
+// Insert a route that maps to a key into the tree
+func (t *Tree) Insert(route string, key string) error {
 	r, err := parser.Parse(trimTrailingSlash(route))
 	if err != nil {
 		return err
 	}
 	// Expand optional and wildcard routes
 	for _, route := range r.Expand() {
-		if err := t.insert(route, path); err != nil {
+		if err := t.insert(route, key); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *Tree) insert(route *ast.Route, path string) error {
+func (t *Tree) insert(route *ast.Route, value string) error {
 	if t.root == nil {
 		t.root = &Node{
-			Route:    route,
-			Path:     path,
+			Route:    route.String(),
+			Value:    value,
+			route:    route,
 			sections: route.Sections,
 		}
 		return nil
 	}
-	return t.root.insert(route, path, route.Sections)
+	return t.root.insert(route, value, route.Sections)
 }
 
 type Node struct {
-	Route    *ast.Route
-	Path     string
+	Route    string
+	Value    string
+	route    *ast.Route
 	sections ast.Sections
 	children Nodes
 }
@@ -98,7 +100,8 @@ func (n *Node) insert(route *ast.Route, path string, sections ast.Sections) erro
 		// Create a new node with the parent's sections after the lcp.
 		splitChild := &Node{
 			Route:    n.Route,
-			Path:     n.Path,
+			Value:    n.Value,
+			route:    n.route,
 			sections: parts[1],
 			children: n.children,
 		}
@@ -107,31 +110,35 @@ func (n *Node) insert(route *ast.Route, path string, sections ast.Sections) erro
 		// Add a new child if we have more sections left.
 		if lcp < sections.Len() {
 			newChild := &Node{
-				Route:    route,
-				Path:     path,
+				Route:    route.String(),
+				route:    route,
+				Value:    path,
 				sections: sections.Split(lcp)[1],
 			}
 			// Replace the parent's sections with the lcp.
 			n.children = append(n.children, newChild)
-			n.Route = nil
-			n.Path = ""
+			n.Route = ""
+			n.route = nil
+			n.Value = ""
 		} else {
 			// Otherwise this route matches the parent. Update the parent's route and
 			// path.
-			n.Route = route
-			n.Path = path
+			n.Route = route.String()
+			n.route = route
+			n.Value = path
 		}
 		sort.Sort(n.children)
 		return nil
 	}
 	// Route already exists
 	if lcp == sections.Len() {
-		if n.Route == nil {
-			n.Route = route
-			n.Path = path
+		if n.route == nil {
+			n.Route = route.String()
+			n.route = route
+			n.Value = path
 			return nil
 		}
-		oldRoute := n.Route.String()
+		oldRoute := n.Route
 		newRoute := route.String()
 		if oldRoute == newRoute {
 			return fmt.Errorf("%w already exists %q", ErrDuplicate, oldRoute)
@@ -146,8 +153,9 @@ func (n *Node) insert(route *ast.Route, path string, sections ast.Sections) erro
 		}
 	}
 	n.children = append(n.children, &Node{
-		Route:    route,
-		Path:     path,
+		Route:    route.String(),
+		route:    route,
+		Value:    path,
 		sections: remainingSections,
 	})
 	sort.Sort(n.children)
@@ -159,9 +167,9 @@ type Slot struct {
 	Value string
 }
 
-func createSlots(route *ast.Route, slotValues []string) (slots []*Slot) {
+func createSlots(r *ast.Route, slotValues []string) (slots []*Slot) {
 	index := 0
-	for _, section := range route.Sections {
+	for _, section := range r.Sections {
 		switch s := section.(type) {
 		case ast.Slot:
 			slots = append(slots, &Slot{
@@ -176,7 +184,7 @@ func createSlots(route *ast.Route, slotValues []string) (slots []*Slot) {
 
 // Match represents a route that matches a path
 type Match struct {
-	Route *ast.Route
+	Route string
 	Input string
 	Slots []*Slot
 	Path  string
@@ -184,7 +192,7 @@ type Match struct {
 
 func (m *Match) String() string {
 	s := new(strings.Builder)
-	s.WriteString(m.Route.String())
+	s.WriteString(m.Route)
 	query := url.Values{}
 	for _, slot := range m.Slots {
 		query.Add(slot.Key, slot.Value)
@@ -225,13 +233,13 @@ func (n *Node) Match(path string, slotValues []string) (*Match, bool) {
 	}
 	if len(path) == 0 {
 		// We've reached a non-routable node
-		if n.Route == nil {
+		if n.Route == "" {
 			return nil, false
 		}
 		return &Match{
 			Route: n.Route,
-			Path:  n.Path,
-			Slots: createSlots(n.Route, slotValues),
+			Path:  n.Value,
+			Slots: createSlots(n.route, slotValues),
 		}, true
 	}
 	for _, child := range n.children {
@@ -260,7 +268,7 @@ func (n *Node) find(route string, sections ast.Sections) (*Node, error) {
 		return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
 	}
 	if lcp == sections.Len() {
-		if n.Route == nil {
+		if n.Route == "" {
 			return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
 		}
 		return n, nil
@@ -294,7 +302,7 @@ func (n *Node) findByPrefix(prefix string, sections ast.Sections) (*Node, error)
 		return nil, fmt.Errorf("%w for %s", ErrNoMatch, sections)
 	}
 	if lcp == sections.Len() {
-		if n.Route == nil {
+		if n.Route == "" {
 			return nil, fmt.Errorf("%w for %s", ErrNoMatch, prefix)
 		}
 		return n, nil
@@ -321,8 +329,8 @@ func (t *Tree) String() string {
 func (t *Tree) string(n *Node, indent string) string {
 	route := n.sections.String()
 	var mods []string
-	if n.Route != nil {
-		mods = append(mods, "routable="+n.Route.String())
+	if n.Route != "" {
+		mods = append(mods, "routable="+n.Route)
 	}
 	mod := ""
 	if len(mods) > 0 {

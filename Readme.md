@@ -37,8 +37,8 @@ func main() {
   r.Insert("/v{major|[0-9]+}.{minor|[0-9]+}", "version.html")
   r.Insert("/{owner}/{repo}/{branch}/{path*}", "repo.html")
   match, _ := r.Match("/matthewmueller/enroute/main/enroute.go")
-  fmt.Println(match.Path) // repo.html
-  fmt.Println(match.Route.String()) // /{owner}/{repo}/{branch}/{path*}
+  fmt.Println(match.Route) // /{owner}/{repo}/{branch}/{path*}
+  fmt.Println(match.Value) // repo.html
   fmt.Println(match.Slots[0].Key, match.Slots[0].Value) // owner matthewmueller
   fmt.Println(match.Slots[1].Key, match.Slots[1].Value) // repo enroute
   // ...
