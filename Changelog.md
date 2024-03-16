@@ -1,3 +1,7 @@
+# 0.0.8 / 2024-03-16
+
+- reduce public api and align match key
+
 # 0.0.7 / 2024-03-16
 
 - rework API based on usage
