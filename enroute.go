@@ -185,7 +185,7 @@ func createSlots(r *ast.Route, slotValues []string) (slots []*Slot) {
 // Match represents a route that matches a path
 type Match struct {
 	Route string
-	Input string
+	Path  string
 	Slots []*Slot
 	Value string
 }
@@ -215,7 +215,7 @@ func (t *Tree) Match(input string) (*Match, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w for %q", ErrNoMatch, input)
 	}
-	match.Input = input
+	match.Path = input
 	return match, nil
 }
 

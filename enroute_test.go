@@ -902,6 +902,7 @@ func ExampleMatch() {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println(match.Path)
 	fmt.Println(match.Route)
 	fmt.Println(match.Value)
 	if len(match.Slots) != 4 {
@@ -914,6 +915,7 @@ func ExampleMatch() {
 	fmt.Println(match.Slots[3].Key, match.Slots[3].Value)
 
 	// Output:
+	// /matthewmueller/routes/main/internal/parser/parser.go
 	// /{owner}/{repo}/{branch}/{path*}
 	// repo.html
 	// owner matthewmueller
