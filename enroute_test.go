@@ -372,10 +372,10 @@ func matchPath(t *testing.T, tree *enroute.Tree, path string, expect string) {
 		}
 		t.Fatal(err.Error())
 	}
-	if match.Route != "" && match.Path == "" {
-		t.Fatalf("routes should always have a path")
-	} else if match.Path != "" && match.Route == "" {
-		t.Fatalf("paths should always have a route")
+	if match.Route != "" && match.Value == "" {
+		t.Fatalf("routes should always have a value")
+	} else if match.Value != "" && match.Route == "" {
+		t.Fatalf("values should always have a route")
 	}
 	actual := match.String()
 	diff.TestString(t, expect, actual)
@@ -903,7 +903,7 @@ func ExampleMatch() {
 		return
 	}
 	fmt.Println(match.Route)
-	fmt.Println(match.Path)
+	fmt.Println(match.Value)
 	if len(match.Slots) != 4 {
 		fmt.Println("expected 4 slots, got ", len(match.Slots))
 		return

@@ -66,29 +66,29 @@ type Node struct {
 	Value    string
 	route    *ast.Route
 	sections ast.Sections
-	children Nodes
+	children nodes
 }
 
-func (n *Node) Priority() (priority int) {
+func (n *Node) priority() (priority int) {
 	if len(n.sections) == 0 {
 		return 0
 	}
 	return n.sections[0].Priority()
 }
 
-type Nodes []*Node
+type nodes []*Node
 
-var _ sort.Interface = (*Nodes)(nil)
+var _ sort.Interface = (*nodes)(nil)
 
-func (n Nodes) Len() int {
+func (n nodes) Len() int {
 	return len(n)
 }
 
-func (n Nodes) Less(i, j int) bool {
-	return n[i].Priority() > n[j].Priority()
+func (n nodes) Less(i, j int) bool {
+	return n[i].priority() > n[j].priority()
 }
 
-func (n Nodes) Swap(i, j int) {
+func (n nodes) Swap(i, j int) {
 	n[i], n[j] = n[j], n[i]
 }
 
@@ -106,7 +106,7 @@ func (n *Node) insert(route *ast.Route, path string, sections ast.Sections) erro
 			children: n.children,
 		}
 		n.sections = parts[0]
-		n.children = Nodes{splitChild}
+		n.children = nodes{splitChild}
 		// Add a new child if we have more sections left.
 		if lcp < sections.Len() {
 			newChild := &Node{
@@ -187,7 +187,7 @@ type Match struct {
 	Route string
 	Input string
 	Slots []*Slot
-	Path  string
+	Value string
 }
 
 func (m *Match) String() string {
@@ -211,7 +211,7 @@ func (t *Tree) Match(input string) (*Match, error) {
 	if t.root == nil || len(input) == 0 || input[0] != '/' {
 		return nil, fmt.Errorf("%w for %q", ErrNoMatch, input)
 	}
-	match, ok := t.root.Match(input, []string{})
+	match, ok := t.root.match(input, []string{})
 	if !ok {
 		return nil, fmt.Errorf("%w for %q", ErrNoMatch, input)
 	}
@@ -219,7 +219,7 @@ func (t *Tree) Match(input string) (*Match, error) {
 	return match, nil
 }
 
-func (n *Node) Match(path string, slotValues []string) (*Match, bool) {
+func (n *Node) match(path string, slotValues []string) (*Match, bool) {
 	for _, section := range n.sections {
 		if len(path) == 0 {
 			return nil, false
@@ -238,12 +238,12 @@ func (n *Node) Match(path string, slotValues []string) (*Match, bool) {
 		}
 		return &Match{
 			Route: n.Route,
-			Path:  n.Value,
+			Value: n.Value,
 			Slots: createSlots(n.route, slotValues),
 		}, true
 	}
 	for _, child := range n.children {
-		if match, ok := child.Match(path, slotValues); ok {
+		if match, ok := child.match(path, slotValues); ok {
 			return match, true
 		}
 	}
