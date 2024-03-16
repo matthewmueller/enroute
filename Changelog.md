@@ -1,3 +1,7 @@
+# 0.0.7 / 2024-03-16
+
+- rework API based on usage
+
 # 0.0.6 / 2024-02-11
 
 - expose a Parse function
