@@ -945,16 +945,15 @@ func TestMultipleSlots(t *testing.T) {
 		••••••••••••••••x-{custom} [routable=/border-spacing-x-{custom}]
 		••••••••••••••••{number} [routable=/border-spacing-{number}]
 	`)
-}
 
-// func TestMultipleSlots2(t *testing.T) {
-// 	tree := enroute.New()
-// 	insertEqual(t, tree, "/border-spacing-x-{custom}", `
-// 		/border-spacing-x-{custom} [routable=/border-spacing-x-{custom}]
-// 	`)
-// 	insertEqual(t, tree, "/border-spacing-{number}", `
-// 		/border-spacing-
-// 		••••••••••••••••x-{custom} [routable=/border-spacing-x-{custom}]
-// 		••••••••••••••••{number} [routable=/border-spacing-{number}]
-// 	`)
-// }
+	// Ensure reverse order produces the same results
+	tree = enroute.New()
+	insertEqual(t, tree, "/border-spacing-x-{custom}", `
+		/border-spacing-x-{custom} [routable=/border-spacing-x-{custom}]
+	`)
+	insertEqual(t, tree, "/border-spacing-{number}", `
+		/border-spacing-
+		••••••••••••••••x-{custom} [routable=/border-spacing-x-{custom}]
+		••••••••••••••••{number} [routable=/border-spacing-{number}]
+	`)
+}
