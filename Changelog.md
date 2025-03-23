@@ -1,3 +1,8 @@
+# 0.0.10 / 2025-03-23
+
+- fix lint error
+- fix lcp bug
+
 # 0.0.9 / 2024-03-16
 
 - Rename match.Input to match.Path
