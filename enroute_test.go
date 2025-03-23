@@ -23,7 +23,7 @@ func insertEqual(t *testing.T, tree *enroute.Tree, route string, expected string
 		}
 		actual := strings.TrimSpace(tree.String())
 		expected = strings.ReplaceAll(strings.TrimSpace(expected), "\t", "")
-		diff.TestString(t, expected, actual)
+		diff.TestString(t, actual, expected)
 	})
 }
 
@@ -933,4 +933,16 @@ func TestParse(t *testing.T) {
 	is.True(err != nil)
 	is.Equal(err.Error(), "path must start with a slash /")
 	is.Equal(route, nil)
+}
+
+func TestMultipleSlots(t *testing.T) {
+	tree := enroute.New()
+	insertEqual(t, tree, "/border-spacing-{number}", `
+		/border-spacing-{number} [routable=/border-spacing-{number}]
+	`)
+	insertEqual(t, tree, "/border-spacing-x-{custom}", `
+		/border-spacing-
+		••••••••••••••••x-{custom} [routable=/border-spacing-x-{custom}]
+		••••••••••••••••{number} [routable=/border-spacing-{number}]
+	`)
 }
