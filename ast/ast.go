@@ -248,16 +248,18 @@ func (p *Path) Compare(sec Section) (index int, equal bool) {
 	if !ok {
 		return index, false
 	}
-	r := []rune(p.Value)
+	r1 := []rune(p.Value)
 	r2 := []rune(p2.Value)
-	max := min(len(r), len(r2))
+	l1 := len(r1)
+	l2 := len(r2)
+	max := min(l1, l2)
 	for i := 0; i < max; i++ {
-		if r[i] != r2[i] {
+		if r1[i] != r2[i] {
 			return index, false
 		}
 		index++
 	}
-	return index, true
+	return index, l1 == l2
 }
 
 func (p *Path) Len() int {

@@ -68,3 +68,26 @@ func TestExpand(t *testing.T) {
 	expandEqual(t, "/{first*}/{last*}", "wildcard slots must be at the end of the path")
 	expandEqual(t, "/first/{last*}", "/first", "/first/{last*}")
 }
+
+func equalLCP(t testing.TB, route1, route2 string, expect int) {
+	is := is.New(t)
+	is.Helper()
+	r1, err := parser.Parse(route1)
+	is.NoErr(err)
+	r2, err := parser.Parse(route2)
+	is.NoErr(err)
+	is.Equal(r1.Sections.LongestCommonPrefix(r2.Sections), expect)
+}
+
+func TestLCP(t *testing.T) {
+	equalLCP(t, "", "", 0)
+	equalLCP(t, "/x", "/x", 2)
+	equalLCP(t, "/x", "/y", 1)
+	equalLCP(t, "/x", "/x/y", 2)
+	equalLCP(t, "/x/y", "/x/y", 4)
+	equalLCP(t, "/x/y", "/x/z", 3)
+
+	equalLCP(t, "/{a}", "/x", 1)
+	equalLCP(t, "/{a}", "/{b}", 2)
+	equalLCP(t, "/x{number}", "/x-{custom}", 2)
+}
