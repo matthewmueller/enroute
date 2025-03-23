@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -49,7 +50,7 @@ func (p *Parser) parseRoute() (*ast.Route, error) {
 func (p *Parser) parseSection() (ast.Section, error) {
 	switch p.tokenType() {
 	case token.Error:
-		return nil, fmt.Errorf(p.tokenText())
+		return nil, errors.New(p.tokenText())
 	case token.Slash:
 		return p.parseSlash()
 	case token.Path:
