@@ -2,6 +2,7 @@ package ast
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -46,7 +47,7 @@ func trimRightSlash(r *Route) *Route {
 func (r *Route) Expand() (routes []*Route) {
 	// Clone the route
 	route := &Route{
-		Sections: append(Sections{}, r.Sections...),
+		Sections: slices.Clone(r.Sections),
 	}
 	for i, section := range route.Sections {
 		switch s := section.(type) {
@@ -132,7 +133,7 @@ func (sections Sections) Len() (n int) {
 }
 
 func (sections Sections) Split(at int) []Sections {
-	sections = append(Sections{}, sections...)
+	sections = slices.Clone(sections)
 	for i, section := range sections {
 		switch s := section.(type) {
 		case *Slash:
@@ -161,7 +162,7 @@ func (sections Sections) Split(at int) []Sections {
 				// Split the path in two
 				leftPath := &Path{Value: left}
 				rightPath := &Path{Value: right}
-				leftSections := append(append(Sections{}, sections[:i]...), leftPath)
+				leftSections := append(slices.Clone(sections[:i]), leftPath)
 				rightSections := append(append(Sections{}, rightPath), sections[i+1:]...)
 				return []Sections{leftSections, rightSections}
 			}

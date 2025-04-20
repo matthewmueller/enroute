@@ -9,6 +9,7 @@ import (
 	"github.com/matryer/is"
 	"github.com/matthewmueller/diff"
 	"github.com/matthewmueller/enroute"
+	"slices"
 )
 
 func insertEqual(t *testing.T, tree *enroute.Tree, route string, expected string) {
@@ -243,6 +244,7 @@ func TestInsertRegexp(t *testing.T) {
 	insertEqual(t, tree, "/{name|[A-Z]}", `
 		/{name|^[A-Z]$} [routable=/{name|^[A-Z]$}]
 	`)
+	insertEqual(t, tree, "/{name|[A-Z]*}", `regexp "[A-Z]*" must match at least one character`)
 	insertEqual(t, tree, "/{path|[0-9]}", `
 		/
 		•{name|^[A-Z]$} [routable=/{name|^[A-Z]$}]
@@ -263,6 +265,7 @@ func TestInsertRegexp(t *testing.T) {
 		•{name} [routable=/{name}]
 	`)
 	insertEqual(t, tree, "/{last*}", `route "/{last*}" is ambiguous with "/{name}"`)
+	// TODO: / shouldn't be routable, it got modified by the error above
 	insertEqual(t, tree, "/first/{last*}", `
 		/ [routable=/]
 		•first [routable=/first]
@@ -381,18 +384,50 @@ func matchPath(t *testing.T, tree *enroute.Tree, path string, expect string) {
 	diff.TestString(t, expect, actual)
 }
 
+// Permute returns every permutation of the slice.
+func permute(routes Routes) (out []Routes) {
+	n := len(routes)
+
+	// routes is too long, return the original
+	// TODO: reduce the size of these tests over time
+	if n > 10 {
+		out = append(out, routes)
+		return out
+	}
+
+	var backtrack func(int)
+	backtrack = func(first int) {
+		if first == n { // base‑case
+			cp := slices.Clone(routes)
+			out = append(out, cp)
+			return
+		}
+		for i := first; i < n; i++ {
+			routes[first], routes[i] = routes[i], routes[first] // choose
+			backtrack(first + 1)                                // recurse ──► ✅ increment!
+			routes[first], routes[i] = routes[i], routes[first] // un‑choose
+		}
+	}
+
+	backtrack(0)
+	return out
+}
+
 func matchEqual(t *testing.T, routes Routes) {
 	t.Helper()
-	tree := enroute.New()
-	for _, route := range routes {
-		if err := tree.Insert(route.Route, "random"); err != nil {
-			t.Fatal(err)
-		}
-		for _, request := range route.Requests {
-			t.Run(route.Route, func(t *testing.T) {
-				t.Helper()
-				matchPath(t, tree, request.Path, request.Expect)
-			})
+	// Test every combo of route order
+	for _, routes := range permute(routes) {
+		tree := enroute.New()
+		for _, route := range routes {
+			if err := tree.Insert(route.Route, "random"); err != nil {
+				t.Fatal(err)
+			}
+			for _, request := range route.Requests {
+				t.Run(route.Route, func(t *testing.T) {
+					t.Helper()
+					matchPath(t, tree, request.Path, request.Expect)
+				})
+			}
 		}
 	}
 }
@@ -414,10 +449,7 @@ func TestSampleMatch(t *testing.T) {
 			{"/hello/", `/hello`},
 		}},
 		{"/", Requests{
-			{"/hello", `/hello`},
-			{"/hello/world", `no match for "/hello/world"`},
 			{"/", `/`},
-			{"/hello/", `/hello`},
 		}},
 	})
 	matchEqual(t, Routes{
@@ -425,29 +457,26 @@ func TestSampleMatch(t *testing.T) {
 			{"/v2", "/v{version} version=2"},
 		}},
 		{"/v{major}.{minor}.{patch}", Requests{
-			{"/v2", "/v{version} version=2"},
 			{"/v2.0.1", "/v{major}.{minor}.{patch} major=2&minor=0&patch=1"},
 		}},
 		{"/v1", Requests{
-			{"/v2", "/v{version} version=2"},
-			{"/v2.0.1", "/v{major}.{minor}.{patch} major=2&minor=0&patch=1"},
 			{"/v1", "/v1"},
 		}},
 		{"/v2.0.0", Requests{
-			{"/v2", "/v{version} version=2"},
-			{"/v2.0.1", "/v{major}.{minor}.{patch} major=2&minor=0&patch=1"},
-			{"/v1", "/v1"},
 			{"/v2.0.0", "/v2.0.0"},
 		}},
 	})
 	matchEqual(t, Routes{
-		{"/users/{id}/edit", Requests{}},
-		{"/users/settings", Requests{}},
-		{"/v.{major}.{minor}", Requests{}},
-		{"/v.1", Requests{
-			{"/v.1.0", `/v.{major}.{minor} major=1&minor=0`},
+		{"/users/{id}/edit", Requests{
 			{"/users/settings/edit", `/users/{id}/edit id=settings`},
+		}},
+		{"/users/settings", Requests{
 			{"/users/settings", `/users/settings`},
+		}},
+		{"/v.{major}.{minor}", Requests{
+			{"/v.1.0", `/v.{major}.{minor} major=1&minor=0`},
+		}},
+		{"/v.1", Requests{
 			{"/v.1", `/v.1`},
 		}},
 	})
@@ -565,11 +594,13 @@ func TestAllMatch(t *testing.T) {
 
 func TestMatchUnicode(t *testing.T) {
 	matchEqual(t, Routes{
-		{"/α", Requests{}},
-		{"/β", Requests{}},
-		{"/δ", Requests{
+		{"/α", Requests{
 			{"/α", `/α`},
+		}},
+		{"/β", Requests{
 			{"/β", `/β`},
+		}},
+		{"/δ", Requests{
 			{"/δ", `/δ`},
 			{"/Δ", `/δ`},
 			{"/αβ", `no match for "/αβ"`},
@@ -579,14 +610,14 @@ func TestMatchUnicode(t *testing.T) {
 
 func TestOptional(t *testing.T) {
 	matchEqual(t, Routes{
-		{"/{id?}", Requests{}},
-		{"/users/{id}.{format?}", Requests{}},
-		{"/users/v{version?}", Requests{}},
-		{"/flights/{from}/{to?}", Requests{
+		{"/{id?}", Requests{
 			{"/", "/"},
 			{"/10", "/{id} id=10"},
 			{"/a", "/{id} id=a"},
-
+			{"/users", "/{id} id=users"},
+			{"/users/", `/{id} id=users`},
+		}},
+		{"/users/{id}.{format?}", Requests{
 			{"/users/10", `no match for "/users/10"`},
 			{"/users/10/", `no match for "/users/10"`},
 			{"/users/10.json", "/users/{id}.{format} format=json&id=10"},
@@ -594,12 +625,12 @@ func TestOptional(t *testing.T) {
 			{"/users/index.html", "/users/{id}.{format} format=html&id=index"},
 			{"/users/ü.html", "/users/{id}.{format} format=html&id=%C3%BC"},
 			{"/users/index.html/more", `no match for "/users/index.html/more"`},
-
-			{"/users", "/{id} id=users"},
-			{"/users/", `/{id} id=users`},
+		}},
+		{"/users/v{version?}", Requests{
 			{"/users/v10", "/users/v{version} version=10"},
 			{"/users/v1", "/users/v{version} version=1"},
-
+		}},
+		{"/flights/{from}/{to?}", Requests{
 			{"/flights/Berlin", "/flights/{from} from=Berlin"},
 			{"/flights/Berlin/", `/flights/{from} from=Berlin`},
 			{"/flights/Berlin/Madison", "/flights/{from}/{to} from=Berlin&to=Madison"},
@@ -618,19 +649,21 @@ func TestLastOptional(t *testing.T) {
 
 func TestWildcard(t *testing.T) {
 	matchEqual(t, Routes{
-		{"/{path*}", Requests{}},
-		{"/users/{id}/{file*}", Requests{}},
-		{"/api/v.{version*}", Requests{
+		{"/{path*}", Requests{
 			{"/", `/`},
 			{"/10", `/{path*} path=10`},
 			{"/10/20", `/{path*} path=10%2F20`},
+			{"/api/v", `/{path*} path=api%2Fv`},
+		}},
+		{"/users/{id}/{file*}", Requests{
 			{"/users/10/dir/file.json", `/users/{id}/{file*} file=dir%2Ffile.json&id=10`},
 			{"/users/10/dir", `/users/{id}/{file*} file=dir&id=10`},
 			{"/users/10", `/users/{id} id=10`},
+		}},
+		{"/api/v.{version*}", Requests{
 			{"/api/v.2/1", `/api/v.{version*} version=2%2F1`},
 			{"/api/v.2.1", `/api/v.{version*} version=2.1`},
 			{"/api/v.", `/api/v.`},
-			{"/api/v", `/{path*} path=api%2Fv`},
 		}},
 	})
 }
@@ -702,60 +735,72 @@ func TestMatchRegexp(t *testing.T) {
 		}},
 	})
 	matchEqual(t, Routes{
-		{"/{path|[A-Z]}", Requests{}},
+		{"/{path|[A-Z]}", Requests{
+			{"/A", `/{path|^[A-Z]$} path=A`},
+		}},
 		{"/{path|[0-9]}", Requests{
-			{"/A", `/{path|^[A-Z]$} path=A`},
 			{"/0", `/{path|^[0-9]$} path=0`},
 			{"/9", `/{path|^[0-9]$} path=9`},
 			{"/09", `no match for "/09"`},
 		}},
 	})
 	matchEqual(t, Routes{
-		{"/{path|[A-Z]}", Requests{}},
-		{"/{path|[0-9]}", Requests{}},
-		{"/{path|[A-Z]+}", Requests{
+		{"/{path|[A-Z]}", Requests{
 			{"/A", `/{path|^[A-Z]$} path=A`},
+		}},
+		{"/{path|[0-9]}", Requests{
 			{"/0", `/{path|^[0-9]$} path=0`},
 			{"/9", `/{path|^[0-9]$} path=9`},
 			{"/09", `no match for "/09"`},
-			{"/AB", `/{path|^[A-Z]+$} path=AB`},
+		}},
+		{"/{path|[A-Z]{2,}}", Requests{
+			{"/AB", `/{path|^[A-Z]{2,}$} path=AB`},
 		}},
 	})
 	matchEqual(t, Routes{
-		{"/{name}", Requests{}},
-		{"/{path|[A-Z]}", Requests{}},
-		{"/{path|[0-9]}", Requests{}},
-		{"/{path|[A-Z]+}", Requests{
+		{"/{name}", Requests{
+			{"/09", `/{name} name=09`},
+		}},
+		{"/{path|[A-Z]}", Requests{
 			{"/A", `/{path|^[A-Z]$} path=A`},
+		}},
+		{"/{path|[0-9]}", Requests{
 			{"/0", `/{path|^[0-9]$} path=0`},
 			{"/9", `/{path|^[0-9]$} path=9`},
-			{"/09", `/{name} name=09`},
-			{"/AB", `/{path|^[A-Z]+$} path=AB`},
+		}},
+		{"/{path|[A-Z]{2,}}", Requests{
+			{"/AB", `/{path|^[A-Z]{2,}$} path=AB`},
 		}},
 	})
 	matchEqual(t, Routes{
-		{"/{name}", Requests{}},
-		{"/{path|[A-Z]}", Requests{}},
-		{"/{path|[0-9]}", Requests{}},
-		{"/first", Requests{}},
-		{"/{path|[A-Z]+}", Requests{
-			{"/A", `/{path|^[A-Z]$} path=A`},
-			{"/0", `/{path|^[0-9]$} path=0`},
-			{"/9", `/{path|^[0-9]$} path=9`},
-			{"/09", `/{name} name=09`},
-			{"/AB", `/{path|^[A-Z]+$} path=AB`},
-			{"/first", `/first`},
+		{"/{name}", Requests{
 			{"/second", `/{name} name=second`},
+			{"/09", `/{name} name=09`},
+		}},
+		{"/{path|[A-Z]}", Requests{
+			{"/A", `/{path|^[A-Z]$} path=A`},
+		}},
+		{"/{path|[0-9]}", Requests{
+			{"/0", `/{path|^[0-9]$} path=0`},
+			{"/9", `/{path|^[0-9]$} path=9`},
+		}},
+		{"/first", Requests{
+			{"/first", `/first`},
+		}},
+		{"/{path|[A-Z]{2,}}", Requests{
+			{"/AB", `/{path|^[A-Z]{2,}$} path=AB`},
 		}},
 	})
 	matchEqual(t, Routes{
-		{"/v{version}", Requests{}},
-		{"/v{major|[0-9]}.{minor|[0-9]}", Requests{}},
-		{"/v{major|[0-9]}.{minor|[0-9]}.{patch|[0-9]}", Requests{
-			{"/v1.2.3", `/v{major|^[0-9]$}.{minor|^[0-9]$}.{patch|^[0-9]$} major=1&minor=2&patch=3`},
-			{"/v1.2", `/v{major|^[0-9]$}.{minor|^[0-9]$} major=1&minor=2`},
+		{"/v{version}", Requests{
 			{"/v1", `/v{version} version=1`},
 			{"/valpha.beta.omega", `/v{version} version=alpha.beta.omega`},
+		}},
+		{"/v{major|[0-9]}.{minor|[0-9]}", Requests{
+			{"/v1.2", `/v{major|^[0-9]$}.{minor|^[0-9]$} major=1&minor=2`},
+		}},
+		{"/v{major|[0-9]}.{minor|[0-9]}.{patch|[0-9]}", Requests{
+			{"/v1.2.3", `/v{major|^[0-9]$}.{minor|^[0-9]$}.{patch|^[0-9]$} major=1&minor=2&patch=3`},
 		}},
 	})
 }
@@ -770,11 +815,12 @@ func TestResource(t *testing.T) {
 		•{id}/edit [routable=/{id}/edit]
 	`)
 	matchEqual(t, Routes{
-		{"/{id}/edit", Requests{}},
-		{"/", Requests{
-			{"/", `/`},
+		{"/{id}/edit", Requests{
 			{"/2/edit", `/{id}/edit id=2`},
 			{"/3/edit", `/{id}/edit id=3`},
+		}},
+		{"/", Requests{
+			{"/", `/`},
 		}},
 	})
 }
@@ -956,4 +1002,43 @@ func TestMultipleSlots(t *testing.T) {
 		••••••••••••••••x-{custom} [routable=/border-spacing-x-{custom}]
 		••••••••••••••••{number} [routable=/border-spacing-{number}]
 	`)
+}
+
+func TestMultipleSlashes(t *testing.T) {
+	matchEqual(t, Routes{
+		{"/", Requests{
+			{"/", `/`},
+			{"//", `/`},
+			{"///", `/`},
+		}},
+	})
+}
+
+func TestMatchPrecedence(t *testing.T) {
+	t.Skip("TODO: support precedence")
+	matchEqual(t, Routes{
+		{"/", Requests{
+			{"/", `/`},
+		}},
+		{"/{digits|[0-9]+}", Requests{
+			{"/10", `/{digits|^[0-9]+$} digits=10`},
+			{"/20", `/{digits|^[0-9]+$} digits=20`},
+			{"/2", `/{digits|^[0-9]+$} digits=2`},
+		}},
+		{"/{public?}", Requests{
+			{"/a", `/{public?} public=a`},
+			{"/a/", `/{public?} public=a`},
+			{"/A", `/{public?} public=A`},
+			{"/α", `/{public?} public=α`},
+		}},
+		{"/{public*}", Requests{
+			{"/a/b", `/{public*} public=a/b`},
+			{"/a/b/", `/{public*} public=a/b/`},
+			{"/a/b/c", `/{public*} public=a/b/c`},
+			{"/α/β/γ", `/{public*} public=α/β/γ`},
+			{"/a/b/c/", `/{public*} public=a/b/c/`},
+			{"/a/b/c/d", `/{public*} public=a/b/c/d`},
+			{"/a/b/c/d/", `/{public*} public=a/b/c/d/`},
+		}},
+	})
 }

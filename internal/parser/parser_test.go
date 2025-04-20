@@ -45,6 +45,8 @@ func TestSample(t *testing.T) {
 	equal(t, `/hello/{name`, `unclosed slot`)
 	equal(t, `/hello/{name|^[A-Za-z]$}`, `/hello/{name|^[A-Za-z]$}`)
 	equal(t, `/hello/{name|^[A-Za-z]{1,3}$}`, `/hello/{name|^[A-Za-z]{1,3}$}`)
+	equal(t, `/hello/{name|^a\/b$}`, `regexp "a\\/b" can't contain '/'`)
+	equal(t, `/hello/{name|^a/b$}`, `regexp "a/b" can't contain '/'`)
 }
 
 func TestAll(t *testing.T) {
@@ -105,4 +107,6 @@ func TestAll(t *testing.T) {
 	equal(t, "/{sLot}", `invalid character 'L' in slot`)
 	equal(t, "/{sloT}", `invalid character 'T' in slot`)
 	equal(t, "/{sloT}/", `invalid character 'T' in slot`)
+	equal(t, "/{first?}/{last}", `optional slots must be at the end of the path`)
+	equal(t, "/{first*}/{last}", `wildcard slots must be at the end of the path`)
 }

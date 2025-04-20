@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/matthewmueller/enroute/internal/token"
+	"slices"
 )
 
 type state = func(l *Lexer) token.Type
@@ -110,10 +111,8 @@ func (l *Lexer) stepUntil(rs ...rune) bool {
 		if l.cp == eof {
 			return false
 		}
-		for _, r := range rs {
-			if l.cp == r {
-				return true
-			}
+		if slices.Contains(rs, l.cp) {
+			return true
 		}
 		l.step()
 	}
@@ -127,7 +126,7 @@ func (l *Lexer) popState() {
 	l.states = l.states[:len(l.states)-1]
 }
 
-func (l *Lexer) errorf(msg string, args ...interface{}) token.Type {
+func (l *Lexer) errorf(msg string, args ...any) token.Type {
 	l.err = fmt.Sprintf(msg, args...)
 	return token.Error
 }

@@ -365,8 +365,9 @@ func (t *Tree) each(n *Node, fn func(n *Node) (next bool)) {
 
 // trimTrailingSlash strips any trailing slash (e.g. /users/ => /users)
 func trimTrailingSlash(input string) string {
-	if input == "/" {
-		return input
+	input = strings.TrimRight(input, "/")
+	if len(input) == 0 {
+		return "/"
 	}
-	return strings.TrimRight(input, "/")
+	return input
 }
