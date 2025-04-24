@@ -34,6 +34,18 @@ func (r *Route) String() string {
 	return s.String()
 }
 
+func (r *Route) Precedence() int {
+	last := r.Sections[len(r.Sections)-1]
+	switch s := last.(type) {
+	case *WildcardSlot:
+		return s.Priority()
+	case *OptionalSlot:
+		return s.Priority()
+	default:
+		return 0
+	}
+}
+
 func trimRightSlash(r *Route) *Route {
 	for i := len(r.Sections) - 1; i >= 0; i-- {
 		if _, ok := r.Sections[i].(*Slash); !ok {
@@ -403,7 +415,7 @@ func (s *OptionalSlot) Match(path string) (index int, slots []string) {
 }
 
 func (p *OptionalSlot) Priority() int {
-	return 0
+	return -1
 }
 
 type WildcardSlot struct {
@@ -454,7 +466,7 @@ func (s *WildcardSlot) Match(path string) (index int, slots []string) {
 }
 
 func (p *WildcardSlot) Priority() int {
-	return 0
+	return -2
 }
 
 type RegexpSlot struct {
