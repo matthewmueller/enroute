@@ -450,22 +450,6 @@ func matchEqual(t *testing.T, routes Routes) {
 	}
 }
 
-func matchExact(t *testing.T, routes Routes) {
-	t.Helper()
-	tree := enroute.New()
-	for _, route := range routes {
-		if err := tree.Insert(route.Route, "random"); err != nil {
-			t.Fatal(err)
-		}
-		for _, request := range route.Requests {
-			t.Run(route.Route, func(t *testing.T) {
-				t.Helper()
-				matchPath(t, tree, request.Path, request.Expect)
-			})
-		}
-	}
-}
-
 func TestSampleMatch(t *testing.T) {
 	matchEqual(t, Routes{})
 	matchEqual(t, Routes{
