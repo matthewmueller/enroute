@@ -1,3 +1,12 @@
+# 0.1.0 / 2025-05-12
+
+- support precedence (exact > regexp > required > optional > wildcard)
+- tighten regexp input
+- better trailing slash trimming
+- run modernize
+- fuzzing match order
+- add test for reverse insertion order
+
 # 0.0.10 / 2025-03-23
 
 - fix lint error
