@@ -1,6 +1,7 @@
 package enroute
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 var ErrDuplicate = fmt.Errorf("route")
 var ErrNoMatch = fmt.Errorf("no match")
+var ErrInvalid = errors.New("invalid route")
 
 func New() *Tree {
 	return &Tree{}
@@ -36,7 +38,7 @@ func (t *Tree) MustInsert(route string, key string) {
 func (t *Tree) Insert(route string, key string) error {
 	r, err := parser.Parse(trimTrailingSlash(route))
 	if err != nil {
-		return err
+		return fmt.Errorf("enroute: %w %q: %w", ErrInvalid, route, err)
 	}
 	initialRoute := r.String()
 	precedence := r.Precedence()
@@ -388,14 +390,15 @@ func (t *Tree) string(n *Node, indent string) string {
 	if len(mods) > 0 {
 		mod = " [" + strings.Join(mods, ", ") + "]"
 	}
-	out := fmt.Sprintf("%s%s%s\n", indent, route, mod)
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("%s%s%s\n", indent, route, mod))
 	for i := 0; i < len(route); i++ {
 		indent += "•"
 	}
 	for _, child := range n.children {
-		out += t.string(child, indent)
+		out.WriteString(t.string(child, indent))
 	}
-	return out
+	return out.String()
 }
 
 // Traverse the tree in depth-first order

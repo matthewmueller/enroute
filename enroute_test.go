@@ -245,7 +245,7 @@ func TestInsertRegexp(t *testing.T) {
 	insertEqual(t, tree, "/{name|[A-Z]}", `
 		/{name|^[A-Z]$} [from=/{name|^[A-Z]$}]
 	`)
-	insertEqual(t, tree, "/{name|[A-Z]*}", `regexp "[A-Z]*" must match at least one character`)
+	insertEqual(t, tree, "/{name|[A-Z]*}", `enroute: invalid route "/{name|[A-Z]*}": regexp "[A-Z]*" must match at least one character`)
 	insertEqual(t, tree, "/{path|[0-9]}", `
 		/
 		•{name|^[A-Z]$} [from=/{name|^[A-Z]$}]
@@ -359,7 +359,7 @@ func TestInvalidSlot(t *testing.T) {
 	insertEqual(t, tree, "/{a}", `
 		/{a} [from=/{a}]
 	`)
-	insertEqual(t, tree, "/{a}{b}", `slot "a" can't have another slot after`)
+	insertEqual(t, tree, "/{a}{b}", `enroute: invalid route "/{a}{b}": slot "a" can't have another slot after`)
 }
 
 type Routes []Route
@@ -664,7 +664,7 @@ func TestLastOptional(t *testing.T) {
 		/slash [from=/slash/{last?}]
 		••••••/{last} [from=/slash/{last?}]
 	`)
-	insertEqual(t, tree, "/not/{last?}/path", `optional slots must be at the end of the path`)
+	insertEqual(t, tree, "/not/{last?}/path", `enroute: invalid route "/not/{last?}/path": optional slots must be at the end of the path`)
 }
 
 func TestWildcard(t *testing.T) {
@@ -694,7 +694,7 @@ func TestLastWildcard(t *testing.T) {
 		/slash [from=/slash/{last*}]
 		••••••/{last*} [from=/slash/{last*}]
 	`)
-	insertEqual(t, tree, "/not/{last*}/path", `wildcard slots must be at the end of the path`)
+	insertEqual(t, tree, "/not/{last*}/path", `enroute: invalid route "/not/{last*}/path": wildcard slots must be at the end of the path`)
 }
 
 func TestMatchDashedSlots(t *testing.T) {
@@ -1140,4 +1140,17 @@ func TestMatchPrecedence(t *testing.T) {
 			{"/α", `/{public?} public=α`},
 		}},
 	})
+}
+
+func TestInsertInvalid(t *testing.T) {
+	is := is.New(t)
+	tree := enroute.New()
+	err := tree.Insert("/HI", "hi")
+	is.True(errors.Is(err, enroute.ErrInvalid))
+	err = tree.Insert("/{a}{b}", "ab")
+	is.True(errors.Is(err, enroute.ErrInvalid))
+	is.NoErr(tree.Insert("/hi", "hi"))
+	err = tree.Insert("/hi", "hi")
+	is.True(errors.Is(err, enroute.ErrDuplicate))
+	is.True(!errors.Is(err, enroute.ErrInvalid))
 }
