@@ -1,3 +1,8 @@
+# 0.3.0 / 2026-11-15
+
+- **BREAKING** make Tree generic, add Routes, fix partial inserts and Find
+- **BREAKING** fix insert order dependence and simplify
+
 # 0.2.0 / 2026-11-15
 
 - add support for an `ErrInvalid` error
