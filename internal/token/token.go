@@ -8,10 +8,8 @@ import (
 type Type string
 
 type Token struct {
-	Type  Type
-	Text  string
-	Start int
-	Line  int
+	Type Type
+	Text string
 }
 
 func (t *Token) String() string {

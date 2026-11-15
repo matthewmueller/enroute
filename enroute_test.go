@@ -226,8 +226,8 @@ func TestWildcards(t *testing.T) {
 		/ [from=/{name*}]
 		•first [from=/first/{last*}]
 		••••••/{last*} [from=/first/{last*}]
+		•{first}/{last} [from=/{first}/{last}]
 		•{name*} [from=/{name*}]
-		••••••••/{last} [from=/{first}/{last}]
 	`)
 	insertEqual(t, tree, "/first/else", `
 		/ [from=/{name*}]
@@ -235,8 +235,8 @@ func TestWildcards(t *testing.T) {
 		••••••/
 		•••••••else [from=/first/else]
 		•••••••{last*} [from=/first/{last*}]
+		•{first}/{last} [from=/{first}/{last}]
 		•{name*} [from=/{name*}]
-		••••••••/{last} [from=/{first}/{last}]
 	`)
 }
 
@@ -997,7 +997,8 @@ func TestParse(t *testing.T) {
 	is.Equal(route.String(), "/posts/{post_id}/comments/{id}")
 	route, err = enroute.Parse("posts/{post_id}/comments/{id}")
 	is.True(err != nil)
-	is.Equal(err.Error(), "path must start with a slash /")
+	is.True(errors.Is(err, enroute.ErrInvalid))
+	is.Equal(err.Error(), `enroute: invalid route "posts/{post_id}/comments/{id}": path must start with a slash /`)
 	is.Equal(route, nil)
 }
 
@@ -1153,4 +1154,120 @@ func TestInsertInvalid(t *testing.T) {
 	err = tree.Insert("/hi", "hi")
 	is.True(errors.Is(err, enroute.ErrDuplicate))
 	is.True(!errors.Is(err, enroute.ErrInvalid))
+}
+
+func TestParseInvalid(t *testing.T) {
+	is := is.New(t)
+	_, err := enroute.Parse("/HI")
+	is.True(errors.Is(err, enroute.ErrInvalid))
+	tree := enroute.New()
+	is.NoErr(tree.Insert("/hi", "hi"))
+	_, err = tree.Find("/HI")
+	is.True(errors.Is(err, enroute.ErrInvalid))
+	_, err = tree.FindByPrefix("/HI")
+	is.True(errors.Is(err, enroute.ErrInvalid))
+}
+
+func TestFindDoesNotChangeTree(t *testing.T) {
+	is := is.New(t)
+	tree := enroute.New()
+	is.NoErr(tree.Insert("/{id}", "id"))
+	before := tree.String()
+	_, err := tree.Find("/{x}.json")
+	is.True(errors.Is(err, enroute.ErrNoMatch))
+	node, err := tree.FindByPrefix("/{x}.json")
+	is.NoErr(err)
+	is.Equal(node.Label, "/{id}")
+	is.Equal(tree.String(), before)
+	match, err := tree.Match("/foo.json")
+	is.NoErr(err)
+	is.Equal(match.String(), "/{id} id=foo.json")
+}
+
+// permutations of routes
+func permutations(routes []string) (out [][]string) {
+	if len(routes) <= 1 {
+		return [][]string{routes}
+	}
+	for i := range routes {
+		rest := append(slices.Clone(routes[:i]), routes[i+1:]...)
+		for _, p := range permutations(rest) {
+			out = append(out, append([]string{routes[i]}, p...))
+		}
+	}
+	return out
+}
+
+func TestInsertOrderIndependent(t *testing.T) {
+	tests := []struct {
+		routes   []string
+		requests map[string]string
+	}{
+		{
+			routes: []string{"/ab", "/ac", "/a{x?}", "/a"},
+			requests: map[string]string{
+				"/a":  "/a",
+				"/ab": "/ab",
+				"/ac": "/ac",
+				"/ad": "/a{x?} x=d",
+			},
+		},
+		{
+			routes: []string{"/x/{name?}", "/x/{id}"},
+			requests: map[string]string{
+				"/x":     "/x/{name?}",
+				"/x/foo": "/x/{id} id=foo",
+			},
+		},
+		{
+			routes: []string{"/x/{rest*}", "/x/{name?}", "/x/{id}"},
+			requests: map[string]string{
+				"/x":       "/x/{name?}",
+				"/x/foo":   "/x/{id} id=foo",
+				"/x/a/b/c": "/x/{rest*} rest=a/b/c",
+			},
+		},
+		{
+			routes: []string{"/{name*}", "/first/{last*}", "/{first}/{last}", "/first/else"},
+			requests: map[string]string{
+				"/a":          "/{name*} name=a",
+				"/a/b":        "/{first}/{last} first=a&last=b",
+				"/a/b/c":      "/{name*} name=a/b/c",
+				"/first/last": "/first/{last*} last=last",
+				"/first/else": "/first/else",
+			},
+		},
+		{
+			routes: []string{"/a/{x*}", "/a/{x}.json"},
+			requests: map[string]string{
+				"/a/b":        "/a/{x*} x=b",
+				"/a/b.json":   "/a/{x}.json x=b",
+				"/a/b/c.json": "/a/{x*} x=b/c.json",
+			},
+		},
+		{
+			routes: []string{"/{id}", "/{id}.{ext}", "/{page?}"},
+			requests: map[string]string{
+				"/":       "/{page?}",
+				"/b":      "/{id} id=b",
+				"/b.json": "/{id}.{ext} id=b&ext=json",
+			},
+		},
+	}
+	for _, test := range tests {
+		for _, routes := range permutations(test.routes) {
+			t.Run(strings.Join(routes, ","), func(t *testing.T) {
+				is := is.New(t)
+				tree := enroute.New()
+				for _, route := range routes {
+					is.NoErr(tree.Insert(route, route))
+				}
+				for path, expect := range test.requests {
+					match, err := tree.Match(path)
+					is.NoErr(err)
+					is.Equal(match.String(), expect)
+				}
+			})
+		}
+	}
 }

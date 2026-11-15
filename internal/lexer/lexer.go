@@ -57,9 +57,8 @@ func (l *Lexer) nextToken() token.Token {
 	l.start = l.end
 	tokenType := l.states[len(l.states)-1](l)
 	t := token.Token{
-		Type:  tokenType,
-		Start: l.start,
-		Text:  l.text(),
+		Type: tokenType,
+		Text: l.text(),
 	}
 	if tokenType == token.Error {
 		t.Text = l.err
@@ -243,60 +242,27 @@ func slotCloseState(l *Lexer) token.Type {
 
 func slotRegexpState(l *Lexer) token.Type {
 	depth := 0
-loop:
 	for l.cp != eof {
 		switch l.cp {
 		case '{':
-			l.step()
 			depth++
 		case '}':
-			if depth > 0 {
-				depth--
-				l.step()
-				continue loop
+			if depth == 0 {
+				l.popState()
+				return token.Regexp
 			}
-			l.popState()
-			return token.Regexp
-		default:
-			l.step()
+			depth--
 		}
+		l.step()
 	}
 	l.popState()
 	return token.End
 }
 
-func isLowerLetter(r rune) bool {
-	return unicode.IsLetter(r) && unicode.IsLower(r)
-}
-
-func isNumber(r rune) bool {
-	return unicode.IsNumber(r)
-}
-
-func isDash(r rune) bool {
-	return r == '-'
-}
-
-func isUnderscore(r rune) bool {
-	return r == '_'
-}
-
-func isPeriod(r rune) bool {
-	return r == '.'
-}
-
-func isLowerAlpha(r rune) bool {
-	return 'a' <= r && r <= 'z'
-}
-
-func isDigit(r rune) bool {
-	return '0' <= r && r <= '9'
-}
-
 func isPathChar(r rune) bool {
-	return isLowerLetter(r) || isNumber(r) || isDash(r) || isUnderscore(r) || isPeriod(r)
+	return unicode.IsLower(r) || unicode.IsNumber(r) || r == '-' || r == '_' || r == '.'
 }
 
 func isSlotChar(r rune) bool {
-	return isLowerAlpha(r) || isDigit(r) || isUnderscore(r)
+	return ('a' <= r && r <= 'z') || ('0' <= r && r <= '9') || r == '_'
 }

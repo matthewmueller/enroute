@@ -1,6 +1,7 @@
 # 0.2.0 / 2026-11-15
 
 - add support for an `ErrInvalid` error
+- invalid route errors from `Insert` are now prefixed with `enroute: invalid route "<route>": `
 
 # 0.1.0 / 2025-05-12
 

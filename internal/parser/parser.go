@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"regexp/syntax"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/matthewmueller/enroute/ast"
@@ -94,10 +95,8 @@ func (p *Parser) parseSlot() (ast.Slot, error) {
 
 func (p *Parser) parseOptionalSlot(key string) (*ast.OptionalSlot, error) {
 	node := &ast.OptionalSlot{
-		Key: key,
-		Delimiters: map[byte]bool{
-			'/': true,
-		},
+		Key:        key,
+		Delimiters: map[byte]bool{'/': true},
 	}
 	if err := p.expect(token.CloseCurly); err != nil {
 		return nil, err
@@ -105,21 +104,13 @@ func (p *Parser) parseOptionalSlot(key string) (*ast.OptionalSlot, error) {
 	if err := p.expect(token.End); err != nil {
 		return nil, fmt.Errorf("optional slots must be at the end of the path")
 	}
-	switch tok := p.l.Peak(1); tok.Type {
-	case token.Path:
-		node.Delimiters[tok.Text[0]] = true
-	case token.OpenCurly:
-		return nil, &ErrSlotAfterSlot{key}
-	}
 	return node, nil
 }
 
 func (p *Parser) parseWildcardSlot(key string) (*ast.WildcardSlot, error) {
 	node := &ast.WildcardSlot{
-		Key: key,
-		Delimiters: map[byte]bool{
-			'/': true,
-		},
+		Key:        key,
+		Delimiters: map[byte]bool{'/': true},
 	}
 	if err := p.expect(token.CloseCurly); err != nil {
 		return nil, err
@@ -127,33 +118,20 @@ func (p *Parser) parseWildcardSlot(key string) (*ast.WildcardSlot, error) {
 	if err := p.expect(token.End); err != nil {
 		return nil, fmt.Errorf("wildcard slots must be at the end of the path")
 	}
-	switch tok := p.l.Peak(1); tok.Type {
-	case token.Path:
-		node.Delimiters[tok.Text[0]] = true
-	case token.OpenCurly:
-		return nil, &ErrSlotAfterSlot{key}
-	}
 	return node, nil
 }
 
 func (p *Parser) parseRegexpSlot(key string) (*ast.RegexpSlot, error) {
 	node := &ast.RegexpSlot{
-		Key: key,
-		Delimiters: map[byte]bool{
-			'/': true,
-		},
+		Key:        key,
+		Delimiters: map[byte]bool{'/': true},
 	}
 	if err := p.expect(token.Regexp); err != nil {
 		return nil, err
 	}
 	pattern := p.tokenText()
 	// Trim leading ^ and trailing $ if present
-	if pattern[0] == '^' {
-		pattern = pattern[1:]
-	}
-	if pattern[len(pattern)-1] == '$' {
-		pattern = pattern[:len(pattern)-1]
-	}
+	pattern = strings.TrimSuffix(strings.TrimPrefix(pattern, "^"), "$")
 	regex, err := regexp.Compile("^" + pattern + "$")
 	if err != nil {
 		return nil, err
@@ -173,72 +151,59 @@ func (p *Parser) parseRegexpSlot(key string) (*ast.RegexpSlot, error) {
 	if err := p.expect(token.CloseCurly); err != nil {
 		return nil, err
 	}
-	switch tok := p.l.Peak(1); tok.Type {
-	case token.Path:
-		node.Delimiters[tok.Text[0]] = true
-	case token.OpenCurly:
-		return nil, &ErrSlotAfterSlot{key}
+	if err := p.delimitAfter(key, node.Delimiters); err != nil {
+		return nil, err
 	}
 	return node, nil
 }
 
 func (p *Parser) parseRequiredSlot(key string) (*ast.RequiredSlot, error) {
 	node := &ast.RequiredSlot{
-		Key: key,
-		Delimiters: map[byte]bool{
-			'/': true,
-		},
+		Key:        key,
+		Delimiters: map[byte]bool{'/': true},
 	}
 	if err := p.expect(token.CloseCurly); err != nil {
 		return nil, err
 	}
-	switch tok := p.l.Peak(1); tok.Type {
-	case token.Path:
-		node.Delimiters[tok.Text[0]] = true
-	case token.OpenCurly:
-		return nil, &ErrSlotAfterSlot{key}
+	if err := p.delimitAfter(key, node.Delimiters); err != nil {
+		return nil, err
 	}
 	return node, nil
+}
+
+// delimitAfter adds the first byte of a following path to the slot's delimiters
+func (p *Parser) delimitAfter(key string, delimiters map[byte]bool) error {
+	switch tok := p.l.Peak(1); tok.Type {
+	case token.Path:
+		delimiters[tok.Text[0]] = true
+	case token.OpenCurly:
+		return &ErrSlotAfterSlot{key}
+	}
+	return nil
 }
 
 func (p *Parser) next() bool {
 	return p.l.Next()
 }
 
-// Returns true if all the given tokens are next
-func (p *Parser) check(tokens ...token.Type) bool {
-	for i, token := range tokens {
-		if p.l.Peak(i+1).Type != token {
-			return false
-		}
-	}
-	return true
-}
-
-// Returns true and advances lexer if all the given tokens are next
-func (p *Parser) accept(tokens ...token.Type) bool {
-	if !p.check(tokens...) {
+// Returns true and advances lexer if tok is next
+func (p *Parser) accept(tok token.Type) bool {
+	if p.l.Peak(1).Type != tok {
 		return false
 	}
-	for i := 0; i < len(tokens); i++ {
-		p.l.Next()
-	}
+	p.l.Next()
 	return true
 }
 
-// Returns an error if all the given tokens are not next
-func (p *Parser) expect(tokens ...token.Type) error {
-	for i, tok := range tokens {
-		peaked := p.l.Peak(i + 1)
-		if peaked.Type == token.Error {
-			return fmt.Errorf(peaked.Text)
-		} else if peaked.Type != tok {
-			return fmt.Errorf("expected %s, got %s", tok, peaked.Type)
-		}
+// Returns an error if tok is not next
+func (p *Parser) expect(tok token.Type) error {
+	peaked := p.l.Peak(1)
+	if peaked.Type == token.Error {
+		return errors.New(peaked.Text)
+	} else if peaked.Type != tok {
+		return fmt.Errorf("expected %s, got %s", tok, peaked.Type)
 	}
-	for i := 0; i < len(tokens); i++ {
-		p.l.Next()
-	}
+	p.l.Next()
 	return nil
 }
 
