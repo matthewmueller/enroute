@@ -15,8 +15,8 @@ var ErrDuplicate = errors.New("route")
 var ErrNoMatch = errors.New("no match")
 var ErrInvalid = errors.New("invalid route")
 
-func New() *Tree {
-	return &Tree{}
+func New[V any]() *Tree[V] {
+	return &Tree[V]{}
 }
 
 // Parse a route
@@ -28,67 +28,90 @@ func Parse(route string) (*ast.Route, error) {
 	return r, nil
 }
 
-type Tree struct {
-	root *Node
+type Tree[V any] struct {
+	root   *Node[V]
+	routes []*Route[V]
+}
+
+// Route is a route as it was inserted
+type Route[V any] struct {
+	Route string
+	Value V
 }
 
 // MustInsert panics if the route is invalid
-func (t *Tree) MustInsert(route string, key string) {
-	if err := t.Insert(route, key); err != nil {
+func (t *Tree[V]) MustInsert(route string, value V) {
+	if err := t.Insert(route, value); err != nil {
 		panic(err)
 	}
 }
 
-// Insert a route that maps to a key into the tree
-func (t *Tree) Insert(route string, key string) error {
+// Insert a route that maps to a value into the tree
+func (t *Tree[V]) Insert(route string, value V) error {
 	r, err := Parse(trimTrailingSlash(route))
 	if err != nil {
 		return err
 	}
 	label, precedence := r.String(), r.Precedence()
 	// Expand optional and wildcard routes
-	for _, route := range r.Expand() {
-		leaf := &Node{Label: label, Value: key, precedence: precedence, route: route, sections: route.Sections}
+	routes := r.Expand()
+	// Check every expanded route before inserting any, so a failed insert
+	// leaves the tree unchanged
+	for _, route := range routes {
+		n := t.find(route.Sections)
+		if n == nil || n.precedence != precedence {
+			continue
+		}
+		if n.route.String() == route.String() {
+			return fmt.Errorf("%w already exists %q", ErrDuplicate, route.String())
+		}
+		return fmt.Errorf("%w %q is ambiguous with %q", ErrDuplicate, label, n.Label)
+	}
+	for _, route := range routes {
+		leaf := &Node[V]{Label: label, Value: value, precedence: precedence, route: route, sections: route.Sections}
 		if t.root == nil {
 			t.root = leaf
 			continue
 		}
-		if err := t.root.insert(leaf); err != nil {
-			return err
-		}
+		t.root.insert(leaf)
 	}
+	t.routes = append(t.routes, &Route[V]{Route: label, Value: value})
 	return nil
 }
 
-type Node struct {
+// Routes returns each route in the order it was inserted
+func (t *Tree[V]) Routes() []*Route[V] {
+	return slices.Clone(t.routes)
+}
+
+type Node[V any] struct {
 	Label      string
-	Value      string
+	Value      V
 	precedence int
 	route      *ast.Route
 	sections   ast.Sections
-	children   nodes
+	children   []*Node[V]
 }
 
-func (n *Node) priority() (priority int) {
+func (n *Node[V]) priority() (priority int) {
 	if len(n.sections) == 0 {
 		return 0
 	}
 	return n.sections[0].Priority()
 }
 
-type nodes []*Node
-
-func sortNodes(n nodes) {
-	slices.SortFunc(n, func(a, b *Node) int { return cmp.Compare(b.priority(), a.priority()) })
+func sortNodes[V any](n []*Node[V]) {
+	slices.SortFunc(n, func(a, b *Node[V]) int { return cmp.Compare(b.priority(), a.priority()) })
 }
 
 // assign makes n the node for leaf's route
-func (n *Node) assign(leaf *Node) {
+func (n *Node[V]) assign(leaf *Node[V]) {
 	n.Label, n.Value, n.precedence, n.route = leaf.Label, leaf.Value, leaf.precedence, leaf.route
 }
 
 // insert leaf below n. leaf.sections holds the sections still to be placed.
-func (n *Node) insert(leaf *Node) error {
+// Conflicts are checked by Tree.Insert beforehand.
+func (n *Node[V]) insert(leaf *Node[V]) {
 	sections := leaf.sections
 	lcp := n.sections.LongestCommonPrefix(sections)
 	n.sections.MergeDelimiters(sections)
@@ -99,50 +122,37 @@ func (n *Node) insert(leaf *Node) error {
 		splitChild := *n
 		splitChild.sections = parts[1]
 		n.sections = parts[0]
-		n.children = nodes{&splitChild}
+		n.children = []*Node[V]{&splitChild}
 		if lcp < sections.Len() {
 			// Add a new child if we have more sections left.
 			leaf.sections = sections.Split(lcp)[1]
 			n.children = append(n.children, leaf)
-			n.Label, n.Value, n.precedence, n.route = "", "", 0, nil
+			var zero V
+			n.Label, n.Value, n.precedence, n.route = "", zero, 0, nil
 		} else {
 			// Otherwise this route matches the parent.
 			n.assign(leaf)
 		}
 		sortNodes(n.children)
-		return nil
+		return
 	}
-	// Route already exists
+	// The route lands on this node. The higher precedence route takes it.
 	if lcp == sections.Len() {
-		// This node was for a split in the tree, but doesn't have a route yet
-		if n.route == nil {
+		if n.route == nil || n.precedence < leaf.precedence {
 			n.assign(leaf)
-			return nil
 		}
-		oldRoute := n.route.String()
-		newRoute := leaf.route.String()
-		// The higher precedence route takes the node
-		if n.precedence != leaf.precedence {
-			if n.precedence < leaf.precedence {
-				n.assign(leaf)
-			}
-			return nil
-		}
-		if newRoute == oldRoute {
-			return fmt.Errorf("%w already exists %q", ErrDuplicate, oldRoute)
-		}
-		return fmt.Errorf("%w %q is ambiguous with %q", ErrDuplicate, leaf.Label, n.Label)
+		return
 	}
 	// Check children for a match
 	leaf.sections = sections.Split(lcp)[1]
 	for _, child := range n.children {
 		if child.sections.At(0) == leaf.sections.At(0) {
-			return child.insert(leaf)
+			child.insert(leaf)
+			return
 		}
 	}
 	n.children = append(n.children, leaf)
 	sortNodes(n.children)
-	return nil
 }
 
 type Slot struct {
@@ -166,14 +176,14 @@ func createSlots(r *ast.Route, slotValues []string) (slots []*Slot) {
 }
 
 // Match represents a route that matches a path
-type Match struct {
+type Match[V any] struct {
 	Route string
 	Path  string
 	Slots []*Slot
-	Value string
+	Value V
 }
 
-func (m *Match) String() string {
+func (m *Match[V]) String() string {
 	s := new(strings.Builder)
 	s.WriteString(m.Route)
 	if len(m.Slots) > 0 {
@@ -191,7 +201,7 @@ func (m *Match) String() string {
 }
 
 // Match a input path to a route
-func (t *Tree) Match(input string) (*Match, error) {
+func (t *Tree[V]) Match(input string) (*Match[V], error) {
 	input = trimTrailingSlash(input)
 	// A tree without any routes shouldn't panic
 	if t.root == nil || len(input) == 0 || input[0] != '/' {
@@ -205,7 +215,7 @@ func (t *Tree) Match(input string) (*Match, error) {
 	return match, nil
 }
 
-func (n *Node) match(path string, slotValues []string) (*Match, bool) {
+func (n *Node[V]) match(path string, slotValues []string) (*Match[V], bool) {
 	for _, section := range n.sections {
 		if len(path) == 0 {
 			return nil, false
@@ -222,7 +232,7 @@ func (n *Node) match(path string, slotValues []string) (*Match, bool) {
 		if n.Label == "" {
 			return nil, false
 		}
-		return &Match{
+		return &Match[V]{
 			Route: n.Label,
 			Value: n.Value,
 			Slots: createSlots(n.route, slotValues),
@@ -236,40 +246,53 @@ func (n *Node) match(path string, slotValues []string) (*Match, bool) {
 	return nil, false
 }
 
-// Find by a route
-func (t *Tree) Find(route string) (*Node, error) {
+// Find the node for a route that was inserted
+func (t *Tree[V]) Find(route string) (*Node[V], error) {
 	r, err := Parse(trimTrailingSlash(route))
 	if err != nil {
 		return nil, err
-	} else if t.root == nil {
-		return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
 	}
-	return t.root.find(route, r.Sections)
-}
-
-// Find by a route
-func (n *Node) find(route string, sections ast.Sections) (*Node, error) {
-	lcp := n.sections.LongestCommonPrefix(sections)
-	if lcp < n.sections.Len() {
-		return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
-	}
-	if lcp == sections.Len() {
-		if n.Label == "" {
-			return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
-		}
-		return n, nil
-	}
-	remainingSections := sections.Split(lcp)[1]
-	for _, child := range n.children {
-		if child.sections.At(0) == remainingSections.At(0) {
-			return child.find(route, remainingSections)
+	// A higher precedence route can take over some of the expanded routes, so
+	// check each one for a node that still belongs to this route.
+	label, routes := r.String(), r.Expand()
+	for i := len(routes) - 1; i >= 0; i-- {
+		if n := t.find(routes[i].Sections); n != nil && n.Label == label {
+			return n, nil
 		}
 	}
 	return nil, fmt.Errorf("%w for %s", ErrNoMatch, route)
 }
 
+// find the routable node with exactly these sections
+func (t *Tree[V]) find(sections ast.Sections) *Node[V] {
+	if t.root == nil {
+		return nil
+	}
+	return t.root.find(sections)
+}
+
+func (n *Node[V]) find(sections ast.Sections) *Node[V] {
+	lcp := n.sections.LongestCommonPrefix(sections)
+	if lcp < n.sections.Len() {
+		return nil
+	}
+	if lcp == sections.Len() {
+		if n.route == nil {
+			return nil
+		}
+		return n
+	}
+	rest := sections.Split(lcp)[1]
+	for _, child := range n.children {
+		if child.sections.At(0) == rest.At(0) {
+			return child.find(rest)
+		}
+	}
+	return nil
+}
+
 // FindByPrefix finds a node by a prefix
-func (t *Tree) FindByPrefix(prefix string) (*Node, error) {
+func (t *Tree[V]) FindByPrefix(prefix string) (*Node[V], error) {
 	route, err := Parse(trimTrailingSlash(prefix))
 	if err != nil {
 		return nil, err
@@ -279,7 +302,7 @@ func (t *Tree) FindByPrefix(prefix string) (*Node, error) {
 	return t.root.findByPrefix(prefix, route.Sections)
 }
 
-func (n *Node) findByPrefix(prefix string, sections ast.Sections) (*Node, error) {
+func (n *Node[V]) findByPrefix(prefix string, sections ast.Sections) (*Node[V], error) {
 	if n.sections.Len() > sections.Len() {
 		return nil, fmt.Errorf("%w for %s", ErrNoMatch, prefix)
 	}
@@ -305,14 +328,14 @@ func (n *Node) findByPrefix(prefix string, sections ast.Sections) (*Node, error)
 	return n, nil
 }
 
-func (t *Tree) String() string {
+func (t *Tree[V]) String() string {
 	if t.root == nil {
 		return ""
 	}
 	return t.string(t.root, "")
 }
 
-func (t *Tree) string(n *Node, indent string) string {
+func (t *Tree[V]) string(n *Node[V], indent string) string {
 	route := n.sections.String()
 	mod := ""
 	if n.Label != "" {
@@ -328,14 +351,14 @@ func (t *Tree) string(n *Node, indent string) string {
 }
 
 // Traverse the tree in depth-first order
-func (t *Tree) Each(fn func(n *Node) (next bool)) {
+func (t *Tree[V]) Each(fn func(n *Node[V]) (next bool)) {
 	if t.root == nil {
 		return
 	}
 	t.each(t.root, fn)
 }
 
-func (t *Tree) each(n *Node, fn func(n *Node) (next bool)) {
+func (t *Tree[V]) each(n *Node[V], fn func(n *Node[V]) (next bool)) {
 	if !fn(n) {
 		return
 	}

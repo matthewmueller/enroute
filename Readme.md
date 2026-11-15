@@ -23,13 +23,13 @@ go get github.com/matthewmueller/enroute
 package main
 
 import (
-	"net/http"
+	"fmt"
 
 	"github.com/matthewmueller/enroute"
 )
 
 func main() {
-  r := enroute.New()
+  r := enroute.New[string]()
   r.Insert("/", "index.html")
   r.Insert("/users/{id}", "users/show.html")
   r.Insert("/posts/{post_id}/comments/{id}", "posts/comments/show.html")
@@ -42,8 +42,15 @@ func main() {
   fmt.Println(match.Slots[0].Key, match.Slots[0].Value) // owner matthewmueller
   fmt.Println(match.Slots[1].Key, match.Slots[1].Value) // repo enroute
   // ...
+
+  // List routes in the order they were inserted
+  for _, route := range r.Routes() {
+    fmt.Println(route.Route, route.Value) // / index.html
+  }
 }
 ```
+
+Values can be any type, e.g. `enroute.New[http.Handler]()`.
 
 ## Contributors
 

@@ -13,7 +13,7 @@ import (
 	"github.com/matthewmueller/enroute"
 )
 
-func insertEqual(t *testing.T, tree *enroute.Tree, route string, expected string) {
+func insertEqual(t *testing.T, tree *enroute.Tree[string], route string, expected string) {
 	t.Helper()
 	t.Run(route, func(t *testing.T) {
 		t.Helper()
@@ -31,7 +31,7 @@ func insertEqual(t *testing.T, tree *enroute.Tree, route string, expected string
 
 // https://en.wikipedia.org/wiki/Radix_tree#Insertion
 func TestWikipediaInsert(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/test", `
 		/test [from=/test]
 	`)
@@ -53,7 +53,7 @@ func TestWikipediaInsert(t *testing.T) {
 		•••••er [from=/slower]
 		•water [from=/water]
 	`)
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	insertEqual(t, tree, "/tester", `
 		/tester [from=/tester]
 	`)
@@ -61,7 +61,7 @@ func TestWikipediaInsert(t *testing.T) {
 		/test [from=/test]
 		•••••er [from=/tester]
 	`)
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	insertEqual(t, tree, "/test", `
 		/test [from=/test]
 	`)
@@ -80,7 +80,7 @@ func TestWikipediaInsert(t *testing.T) {
 }
 
 func TestSampleInsert(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/hello/{name}", `
 		/hello/{name} [from=/hello/{name}]
 	`)
@@ -115,7 +115,7 @@ func TestSampleInsert(t *testing.T) {
 }
 
 func TestEqual(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/hello/{name}", `
 		/hello/{name} [from=/hello/{name}]
 	`)
@@ -125,7 +125,7 @@ func TestEqual(t *testing.T) {
 		••••••/{name} [from=/hello/{name}]
 	`)
 	insertEqual(t, tree, "/hello", `route already exists "/hello"`)
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	insertEqual(t, tree, "/{name}", `
 		/{name} [from=/{name}]
 	`)
@@ -133,7 +133,7 @@ func TestEqual(t *testing.T) {
 }
 
 func TestDifferentSlots(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{name}", `
 		/{name} [from=/{name}]
 	`)
@@ -147,7 +147,7 @@ func TestDifferentSlots(t *testing.T) {
 		••••••••else [from=/{first}/else]
 		••••••••{last} [from=/{first}/{last}]
 	`)
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	insertEqual(t, tree, "/{name}", `
 		/{name} [from=/{name}]
 	`)
@@ -159,7 +159,7 @@ func TestDifferentSlots(t *testing.T) {
 }
 
 func TestPathAfter(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{name}", `
 		/{name} [from=/{name}]
 	`)
@@ -181,7 +181,7 @@ func TestPathAfter(t *testing.T) {
 }
 
 func TestOptionals(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{name?}", `
 		/ [from=/{name?}]
 		•{name} [from=/{name?}]
@@ -211,7 +211,7 @@ func TestOptionals(t *testing.T) {
 }
 
 func TestWildcards(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{name*}", `
 		/ [from=/{name*}]
 		•{name*} [from=/{name*}]
@@ -241,7 +241,7 @@ func TestWildcards(t *testing.T) {
 }
 
 func TestInsertRegexp(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{name|[A-Z]}", `
 		/{name|^[A-Z]$} [from=/{name|^[A-Z]$}]
 	`)
@@ -300,7 +300,7 @@ func TestInsertRegexp(t *testing.T) {
 }
 
 func TestInsertRegexpSlotFirst(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{name}", `
 		/{name} [from=/{name}]
 	`)
@@ -312,7 +312,7 @@ func TestInsertRegexpSlotFirst(t *testing.T) {
 }
 
 func TestRootSwap(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/hello", `
 		/hello [from=/hello]
 	`)
@@ -323,7 +323,7 @@ func TestRootSwap(t *testing.T) {
 }
 
 func TestPriority(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/v{version}", `
 	/v{version} [from=/v{version}]
 	`)
@@ -332,7 +332,7 @@ func TestPriority(t *testing.T) {
 	••2 [from=/v2]
 	••{version} [from=/v{version}]
 	`)
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	insertEqual(t, tree, "/v{version}", `
 		/v{version} [from=/v{version}]
 	`)
@@ -343,7 +343,7 @@ func TestPriority(t *testing.T) {
 }
 
 func TestSlotSplit(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/users/{id}/edit", `
 		/users/{id}/edit [from=/users/{id}/edit]
 	`)
@@ -355,7 +355,7 @@ func TestSlotSplit(t *testing.T) {
 }
 
 func TestInvalidSlot(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{a}", `
 		/{a} [from=/{a}]
 	`)
@@ -376,7 +376,7 @@ type Request struct {
 	Expect string
 }
 
-func matchPath(t *testing.T, tree *enroute.Tree, path string, expect string) error {
+func matchPath(t *testing.T, tree *enroute.Tree[string], path string, expect string) error {
 	t.Helper()
 	match, err := tree.Match(path)
 	if err != nil {
@@ -427,7 +427,7 @@ func matchEqual(t *testing.T, routes Routes) {
 	t.Helper()
 	// Test every combo of route order
 	for _, routes := range permute(routes) {
-		tree := enroute.New()
+		tree := enroute.New[string]()
 		for _, route := range routes {
 			if err := tree.Insert(route.Route, "random"); err != nil {
 				for i, r := range routes {
@@ -502,7 +502,7 @@ func TestSampleMatch(t *testing.T) {
 
 func TestNonRoutableNoMatch(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	is.NoErr(tree.Insert("/hello", ""))
 	is.NoErr(tree.Insert("/world", ""))
 	match, err := tree.Match("/")
@@ -512,14 +512,14 @@ func TestNonRoutableNoMatch(t *testing.T) {
 
 func TestNoRoutes(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	match, err := tree.Match("/")
 	is.True(errors.Is(err, enroute.ErrNoMatch))
 	is.Equal(match, nil)
 	match, err = tree.Match("/a")
 	is.True(errors.Is(err, enroute.ErrNoMatch))
 	is.Equal(match, nil)
-	tree.Each(func(n *enroute.Node) bool {
+	tree.Each(func(n *enroute.Node[string]) bool {
 		is.Fail() // should not be called
 		return true
 	})
@@ -659,7 +659,7 @@ func TestOptional(t *testing.T) {
 }
 
 func TestLastOptional(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/slash/{last?}/", `
 		/slash [from=/slash/{last?}]
 		••••••/{last} [from=/slash/{last?}]
@@ -689,7 +689,7 @@ func TestWildcard(t *testing.T) {
 }
 
 func TestLastWildcard(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/slash/{last*}/", `
 		/slash [from=/slash/{last*}]
 		••••••/{last*} [from=/slash/{last*}]
@@ -710,7 +710,7 @@ func TestMatchDashedSlots(t *testing.T) {
 
 func TestBackupTree(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{post_id}/comments", `
 		/{post_id}/comments [from=/{post_id}/comments]
 	`)
@@ -728,7 +728,7 @@ func TestBackupTree(t *testing.T) {
 }
 
 func TestToRoutable(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/last", `
 		/last [from=/last]
 	`)
@@ -826,7 +826,7 @@ func TestMatchRegexp(t *testing.T) {
 }
 
 func TestResource(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{id}/edit", `
 		/{id}/edit [from=/{id}/edit]
 	`)
@@ -847,7 +847,7 @@ func TestResource(t *testing.T) {
 
 func TestFind(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	a := "a"
 	b := "b"
 	is.NoErr(tree.Insert(`/{post_id}/comments`, a))
@@ -867,7 +867,7 @@ func TestFind(t *testing.T) {
 
 func TestFindByPrefix(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	a := "a"
 	is.NoErr(tree.Insert("/", a))
 	node, err := tree.FindByPrefix("/{post_id}/comments")
@@ -902,7 +902,7 @@ func TestFindByPrefix(t *testing.T) {
 	is.Equal(node.Label, "/")
 
 	// No root initially
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	is.NoErr(tree.Insert("/{post_id}/comments", a))
 	node, err = tree.FindByPrefix("/{post_id}/comments")
 	is.NoErr(err)
@@ -956,7 +956,7 @@ func TestFindByPrefix(t *testing.T) {
 }
 
 func ExampleMatch() {
-	matcher := enroute.New()
+	matcher := enroute.New[string]()
 	matcher.Insert("/", "index.html")
 	matcher.Insert("/users/{id}", "users/show.html")
 	matcher.Insert("/posts/{post_id}/comments/{id}", "posts/comments/show.html")
@@ -1003,7 +1003,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestMultipleSlots(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/border-spacing-{number}", `
 		/border-spacing-{number} [from=/border-spacing-{number}]
 	`)
@@ -1014,7 +1014,7 @@ func TestMultipleSlots(t *testing.T) {
 	`)
 
 	// Ensure reverse order produces the same results
-	tree = enroute.New()
+	tree = enroute.New[string]()
 	insertEqual(t, tree, "/border-spacing-x-{custom}", `
 		/border-spacing-x-{custom} [from=/border-spacing-x-{custom}]
 	`)
@@ -1036,7 +1036,7 @@ func TestMultipleSlashes(t *testing.T) {
 }
 
 func TestExisting(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	insertEqual(t, tree, "/{path*}", `
 		/ [from=/{path*}]
 		•{path*} [from=/{path*}]
@@ -1055,14 +1055,14 @@ func noErr(t *testing.T, err error) {
 }
 
 func TestHandlePrecedence(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	noErr(t, tree.Insert("/{digits|[0-9]+}", "/{digits|[0-9]+}"))
 	noErr(t, tree.Insert("/{public*}", "/{public*}"))
 	noErr(t, tree.Insert("/", "/"))
 }
 
 func TestHandleWildcardOptional(t *testing.T) {
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	noErr(t, tree.Insert("/", "/"))
 	noErr(t, tree.Insert("/{digits|[0-9]+}", "/{digits|[0-9]+}"))
 	noErr(t, tree.Insert("/{public*}", "/{public*}"))
@@ -1145,7 +1145,7 @@ func TestMatchPrecedence(t *testing.T) {
 
 func TestInsertInvalid(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	err := tree.Insert("/HI", "hi")
 	is.True(errors.Is(err, enroute.ErrInvalid))
 	err = tree.Insert("/{a}{b}", "ab")
@@ -1160,7 +1160,7 @@ func TestParseInvalid(t *testing.T) {
 	is := is.New(t)
 	_, err := enroute.Parse("/HI")
 	is.True(errors.Is(err, enroute.ErrInvalid))
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	is.NoErr(tree.Insert("/hi", "hi"))
 	_, err = tree.Find("/HI")
 	is.True(errors.Is(err, enroute.ErrInvalid))
@@ -1170,7 +1170,7 @@ func TestParseInvalid(t *testing.T) {
 
 func TestFindDoesNotChangeTree(t *testing.T) {
 	is := is.New(t)
-	tree := enroute.New()
+	tree := enroute.New[string]()
 	is.NoErr(tree.Insert("/{id}", "id"))
 	before := tree.String()
 	_, err := tree.Find("/{x}.json")
@@ -1258,7 +1258,7 @@ func TestInsertOrderIndependent(t *testing.T) {
 		for _, routes := range permutations(test.routes) {
 			t.Run(strings.Join(routes, ","), func(t *testing.T) {
 				is := is.New(t)
-				tree := enroute.New()
+				tree := enroute.New[string]()
 				for _, route := range routes {
 					is.NoErr(tree.Insert(route, route))
 				}
@@ -1270,4 +1270,70 @@ func TestInsertOrderIndependent(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestFailedInsertLeavesTreeUnchanged(t *testing.T) {
+	is := is.New(t)
+	tree := enroute.New[string]()
+	is.NoErr(tree.Insert("/{c}/{d?}", "c"))
+	before := tree.String()
+	// "/{page?}" expands to "/" and "/{page}". "/{page}" is ambiguous with
+	// "/{c}", so "/" must not be inserted either.
+	err := tree.Insert("/{page?}", "page")
+	is.True(errors.Is(err, enroute.ErrDuplicate))
+	is.Equal(tree.String(), before)
+	_, err = tree.Match("/")
+	is.True(errors.Is(err, enroute.ErrNoMatch))
+	is.Equal(len(tree.Routes()), 1)
+}
+
+func TestFindReturnsOwnRoute(t *testing.T) {
+	is := is.New(t)
+	tree := enroute.New[string]()
+	is.NoErr(tree.Insert("/{page?}", "page"))
+	is.NoErr(tree.Insert("/{id}", "id"))
+	// "/{id}" takes over "/{page}", but "/" still belongs to "/{page?}"
+	node, err := tree.Find("/{page?}")
+	is.NoErr(err)
+	is.Equal(node.Label, "/{page?}")
+	is.Equal(node.Value, "page")
+	node, err = tree.Find("/{id}")
+	is.NoErr(err)
+	is.Equal(node.Label, "/{id}")
+	is.Equal(node.Value, "id")
+	// A route with the same shape that wasn't inserted isn't found
+	_, err = tree.Find("/{other}")
+	is.True(errors.Is(err, enroute.ErrNoMatch))
+	// Once "/" is taken too, "/{page?}" can't be found
+	is.NoErr(tree.Insert("/", "index"))
+	_, err = tree.Find("/{page?}")
+	is.True(errors.Is(err, enroute.ErrNoMatch))
+}
+
+func TestRoutes(t *testing.T) {
+	is := is.New(t)
+	tree := enroute.New[int]()
+	is.NoErr(tree.Insert("/users/{id}", 1))
+	is.NoErr(tree.Insert("/posts/{slug?}", 2))
+	is.NoErr(tree.Insert("/{path*}", 3))
+	is.True(tree.Insert("/users/{id}", 4) != nil)
+	var routes []string
+	for _, route := range tree.Routes() {
+		routes = append(routes, fmt.Sprintf("%s=%d", route.Route, route.Value))
+	}
+	is.Equal(strings.Join(routes, " "), "/users/{id}=1 /posts/{slug?}=2 /{path*}=3")
+}
+
+func TestValueType(t *testing.T) {
+	is := is.New(t)
+	type handler struct{ name string }
+	tree := enroute.New[*handler]()
+	show := &handler{"show"}
+	is.NoErr(tree.Insert("/users/{id}", show))
+	match, err := tree.Match("/users/10")
+	is.NoErr(err)
+	is.Equal(match.Value, show)
+	node, err := tree.Find("/users/{id}")
+	is.NoErr(err)
+	is.Equal(node.Value, show)
 }
